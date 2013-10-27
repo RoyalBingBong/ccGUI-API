@@ -1,0 +1,36 @@
+--- Text color
+-- @class table
+-- @name defaulTextColor
+-- @field defaulTextColor the default text color: <code>colors.white</code>
+defaulTextColor = colors.white
+
+
+--- Background color
+-- @class table
+-- @name defaultBackgroundColor
+-- @field defaultBackgroundColor the default background color: <code>colors.black</code>
+defaultBackgroundColor = colors.black
+
+--- Activated button color
+-- @class table
+-- @name defaultBtnActiveBackground
+-- @field defaultBtnActiveBackground the default color for an actived button: <code>colors.lime</code>
+defaultBtnActiveBackground = colors.lime
+
+--- Deactivated button color
+-- @class table
+-- @name defaultBtnNonActiveBackground
+-- @field defaultBtnNonActiveBackground the default color for an deactived button: <code>colors.red</code>
+defaultBtnNonActiveBackground = colors.red
+
+--- Horizontal text position
+-- @class table
+-- @name defaultHPosition
+-- @field defaultHPosition the default horizontal text position. <code>center</code>
+defaultHPosition = "center"
+
+--- Vertical text position
+-- @class table
+-- @name defaultVPosition
+-- @field defaultVPosition the default vertical text position: <code>center</code>
+defaultVPosition = "center"

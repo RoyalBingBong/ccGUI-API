@@ -1,0 +1,179 @@
+local version = 1.0
+--- asdasdasd
+-- @name Screenyyyyy
+-- @copyright 2013 DerKoch AKA RoyalBingBong
+-- @release Version 1.0
+
+Screen = {}
+Screen.__index = Screen
+--- Creates a new screen
+-- @param side the side of the adjacent Advanced Monitor
+-- @param row the amount of rows
+-- @param column the amount of columns
+-- @return instance of Screen
+function Screen.create (side, row, column)	
+	local scn = {}
+	setmetatable(scn, Screen)
+	scn.mon = peripheral.wrap(side)
+	scn.mon.setTextScale(1)
+	--scn.screenx, scn.screeny = scn.mon.getSize()
+	scn.rows = tonumber(row)
+	scn.columns = tonumber(column)
+	-- setup elements array
+	scn.elements = {}
+	for i = 1, row do
+		scn.elements[i] = {}
+		for j = 1, column do
+			scn.elements[i][j] = nil
+		end
+	end	
+	scn.margin = {
+		["top"]  = 1;
+		["right"]  = 1;
+		["bottom"]  = 1;
+		["left"]  = 1;
+	}
+	scn.mon.clear()
+	scn.mon.setCursorPos(1,1)
+	return scn
+end
+
+--- Initializes all screen elements. Calculates dimensions for each element in the grid
+function Screen:initGrid()	
+	x,y = self.mon.getSize()	
+	maxCellHeight = (y - (self.rows + 1)) / self.rows
+	maxCellWidth = (x - (self.columns + 1)) / self.columns
+	--cellHeight = 3
+	
+	cellHeight = math.floor(maxCellHeight)
+	-- cellHeight = math.floor(maxCellHeight) -- (self.margin["top"] + self.margin["bottom"])
+	-- if math.fmod(cellHeight, 2) == 0 then
+		-- cellHeight = cellHeight + 1	
+		-- --print(cellHeight)
+	-- end
+	cellWidth = math.floor(maxCellWidth) -- (self.margin["left"] + self.margin["right"])
+	--print(x .. ", " .. y .. ", " .. cellWidth)
+	--i*(cellWidth + self.margin["left"] 
+	--~ i = row = y value !!!!!!!!!
+	--~ j = column = x value !!!!!!!!!
+	for i=1, self.rows do	
+		for j=1, self.columns do		
+			if self.elements[i][j] ~= nil then
+				local minx, maxx, miny, maxy = self.elements[i][j]:getMinMaxXY()				
+				if minx ~= 0 and maxx ~= 0 and miny ~= 0 and maxy ~= 0 then
+					--self.elements[i][j]:debugPrint()
+					--print(minx .. ", " .. maxx .. ", " .. miny .. ", " .. maxy)
+					maxx = j * (cellWidth + self.margin["left"]) -- or j * self.margin["left"] --needs testing
+					maxy = i * (cellHeight + self.margin["bottom"])
+					--print(minx .. ", " .. maxx .. ", " .. miny .. ", " .. maxy)
+					self.elements[i][j]:setMinMaxXY(minx,maxx,miny,maxy)					
+					self.elements[i][j] = nil
+				else					
+					--self.elements[i][j]:debugPrint()
+					minx = self.margin["left"] + (j - 1) * cellWidth + j * self.margin["left"]
+					maxx = minx + cellWidth - self.margin["left"] -- or j * self.margin["left"] --needs testing
+					miny = self.margin["top"] + (i - 1) * cellHeight + i * self.margin["top"]
+					maxy = miny + cellHeight - self.margin["bottom"]
+					self.elements[i][j]:setMinMaxXY(minx,maxx,miny,maxy)
+					self.elements[i][j]:setTarget(self.mon)
+				end
+			end
+		end		
+	end		
+end
+
+--- Returns the indices, to find the elements in self.elements
+-- @param name the name of the element
+-- @return row, column
+function Screen:getElementByName(name)
+	for i = 1, self.rows do
+		for j = 1, self.columns do
+			local elemname = self.elements[i][j].name
+			if elemname == name then
+				return i, j
+			end	
+		end
+	end
+end
+
+--- Sets the text scale for the screen and redraws
+-- @param factor the scale factor
+function Screen:setTextScale(factor)
+	self.mon.clear()
+	self.mon.setTextScale(factor)
+	self:draw()
+end
+
+--- Adds an element to the grid
+-- @param element	the element to be added
+-- @param rows	the row (>= 1) the element should be in, can be a table
+-- @param columns	the column (>= 1) the element should be in, can be a table
+-- @usage Adds btn1 to row: 1, column 1<br>Screen:addElementToGrid (btn1, 1, 1)
+-- @usage Adds btn1 to row: 1 and 2, column 1 and 2<br>Screen:addElementToGrid (btn1, {1,2}, {1,2})
+function Screen:addElementToGrid (element, rows, columns)
+	if type(rows) == "table" or type(columns) == "table" then		
+		if type(rows) == "table" and type(columns) == "table" then
+			for i = 1, #rows do
+				for j = 1, #columns do
+					self.elements[rows[i]][columns[j]] = element
+				end
+			end			
+		elseif type(rows) ~= "table" and type(columns) == "table" then
+			for j = 1, #columns do
+				self.elements[rows][columns[j]] = element
+			end
+		elseif type(rows) == "table" and type(columns) ~= "table" then
+			for i = 1, #rows do
+				self.elements[rows[i]][columns] = element
+			end
+		end
+	else
+		if rows > self.rows or columns > self.columns then
+			error("addElementToGrid: row or column out of bounds")
+		else			
+			self.elements[rows][columns] = element
+		end
+	end
+end
+
+--- Draws the screen
+-- Only needed after first initiation
+function Screen:draw()
+	for i=1, self.rows do
+		for j=1, self.columns do
+			if self.elements[i][j] ~= nil then
+				--self.elements[i][j]:debugPrint()
+				self.elements[i][j]:draw(self.mon)
+				--self:drawElement(self.elements[i][j])
+			end
+		end
+	end
+end
+
+--- Checks if an element was clicked
+-- @param event	the touch event
+-- @param side the side of the touch event
+-- @param x	the x position of the touch event
+-- @param y	the y position of the touch event
+function Screen:checkTouchEvent(event,side,x,y)
+	-- maybe optimize search for element with approximation?
+	for i = 1, self.rows do
+		for j = 1, self.columns do
+			if self.elements[i][j] ~= nil then
+				if self.elements[i][j]:isClicked(x,y) then
+					if self.elements[i][j].type == "button" then
+						if self.elements[i][j]:execFunction() then
+							if self.elements[i][j].radioIndex ~= nil then
+								self.elements[i][j]:toggleOthers(self.elements)									
+							else
+								self.elements[i][j]:toggle()
+							end						
+						end
+					elseif self.elements[i][j].type == "picker" then
+						self.elements[i][j]:execFunction()
+					end
+				end
+			end
+		end
+	end
+end

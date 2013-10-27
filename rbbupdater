@@ -1,0 +1,61 @@
+-- ccGUI-API Updater by DerKoch AKA RoyalBingBong
+-- Original idea for updater by Henness's "Advanced Updater"
+
+-- Config
+local author = "RoyalBingBong"
+local project = "ccGUI-API"
+local branch = "master"
+local files = {"guiElements", "helper", "screen", "config"}
+local dir = "RBB/"
+
+--~ ##### Original Henness code START #####
+function getLink(file)
+	return "https://raw.github.com/" .. author .. "/" .. project .. "/" .. branch .. "/" .. file
+end
+
+function download(file, name)
+	print("Downloading, " .. file)
+	local data = http.get(getLink(file))
+	if data then
+		print(file .. " downloaded")
+		local file = fs.open(name,"w")
+		file.write(data.readAll())
+		file.close()
+		return true
+	end
+end
+--~ ##### Original Henness code END #####
+
+function isNewer(oldfile, newfile)
+	fold = fs.open(oldfile, "r")
+	fnew = fs.open(newfile, "r")
+	foldversion = fold.readLine()
+	fnewversion = fnew.readLine()
+	fold.close()
+	fnew.close()
+	foldversion = strsub (foldversion, strfind (foldversion, "="))
+	fnewversion = strsub (fnewversion, strfind (fnewversion, "="))
+	return tonumber(foldversion) < tonumber(fnewversion)
+end
+
+function downloadAll()
+	for _, fname in pairs(files) do
+		download(fname, dir .. fname .. "tmp")
+	end
+end
+-- Deletes or renames files according to their version number
+function checkAll()
+	for _,fname in pairs(files) do
+		if isNewer(dir..fname, dir..fname.."tmp") then
+			fs.delete(dir..fname)
+			fs.move(dir..fname.."tmp", dir..fname)
+		else
+			fs.delete(dir..fname.."tmp")
+		end	
+	end
+end
+
+downloadAll()
+checkAll()
+
+

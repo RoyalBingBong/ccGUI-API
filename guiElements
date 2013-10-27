@@ -1,0 +1,533 @@
+local version = 1.0
+
+os.loadAPI("./RBB/config")
+
+
+--~ ##### Element START #####
+Element = {}
+Element.__index = Element
+
+--- Creates a new Element
+-- @param name	the name of the element, should be unique
+-- @param elemtype	the type of the element (e.g. "button","label","picker")
+function Element.create (name, elemtype)
+	local elem = {}
+	setmetatable(elem, Element)
+	elem.name = name
+	elem.type = elemtype
+	elem.color = config.defaulTextColor
+	elem.bgcolor = config.defaultBackgroundColor
+	elem.target = nil
+	elem.minx = 0
+	elem.maxx = 0
+	elem.miny = 0
+	elem.maxy = 0
+	return elem
+end
+
+--- Returns minimum and maximum x and y values of the element
+-- @return <code>minx, maxx, miny, maxy</code>
+function Element:getMinMaxXY()
+	return self.minx, self.maxx, self.miny, self.maxy
+end
+
+--- Sets minimum and maximum x and y values for the the element
+-- @param minx minimum x value
+-- @param maxx maximum x value
+-- @param miny minimum y value
+-- @param maxy maximum y value
+function Element:setMinMaxXY(minx,maxx,miny,maxy)
+	-- if self == nil then
+		-- return
+	-- end
+	self.minx = minx
+	self.maxx = maxx
+	self.miny = miny
+	self.maxy = maxy
+end
+
+--- Prints element information for debugging purposes
+function Element:debugPrint()
+	print("ElementDEBUG:")
+	print("\tname:\t" .. self.name)
+	print("\ttype:\t" .. self.type)
+	print("\txmin: " .. self.minx .. ", xmax: ".. self.maxx .. ", ymin: " .. self.miny .. ", ymax: " .. self.maxy)
+end
+
+--- Checks if element was clicked at coordinate (<code>x</code>,<code>y</code>)
+-- @param x the x click position
+-- @param y	the y click position
+-- @return <code>true</code> clicked<br><code>false</code> not clicked
+function Element:isClicked(x,y)
+	if x >= self.minx and x <= self.maxx then
+		if y >= self.miny and y <= self.maxy then
+			helper.debug_print("Element:isClicked", self.name)
+			return true
+		end
+	end
+	return false
+end
+
+--- Sets the target of the element
+-- @param target the target, e.g. a monitor
+function Element:setTarget(target)
+	self.target = target
+end
+
+--- Clears the area around <code>(minx, miny)</code> to <code>(maxx,maxy)</code> with
+-- the default colors.
+-- @param target the monitor the Element will be drawn to
+function Element:clear(target)
+	-- clear the grid with base colors, just in case...
+	-- self:debugPrint()
+	target.setTextColor(self.color)
+	target.setBackgroundColor(self.bgcolor)
+	for i = self.minx, self.maxx do
+		for j = self.miny, self.maxy do
+			target.setCursorPos(i,j)
+			target.write(" ")
+		end
+	end
+end
+
+--- Sets the text color of the element
+-- Sets the color to a different one. For more info look in
+-- colors-API
+-- @param newcolor the new text color
+function Element:setTextColor(newcolor)
+	self.color = newcolor
+end
+
+--- Sets the background color of the element
+-- @param newbgcolor the new background color
+function Element:setBGColor(newbgcolor)
+	--print("setting color to: " .. tostring(newbgcolor))
+	self.bgcolor = newbgcolor
+end
+--~ ##### Element END #####
+
+--~ ##### Button START #####
+Button = {}
+Button.__index = Button
+
+--- Creates a new Button
+-- @param name	the ame to of the button
+-- @param text	the button text, duh!
+-- @param active	the state of the button. <code>true</code> activated, <code>false</code> deactivated
+-- @param func	the function that will be executed when pressing the button
+-- @param funcparams	the parameters the function will be executed with (<code>table</code>)
+function Button.create(name, text, active, func, funcparams)
+	local button = Element.create(name, "button")
+	setmetatable(Button, Element)
+	setmetatable(button, Button)
+	button.text = text
+	button.active = active
+	button.func = func
+	if funcparams ~= nil and type(funcparams) ~= "table" then
+		error("Button.create: funcparams needs to be a table!")
+	end
+	button.params = funcparams
+	button.colorActive = config.defaultBtnActiveBackground
+	button.colorNonActive = config.defaultBtnNonActiveBackground
+	button.radioIndex = nil
+	button.textposition = {h = config.defaultHPosition, v = config.defaultVPosition}
+	return button
+end
+
+--- Checks if button was clicked at coordinate (<code>x</code>,<code>y</code>)
+-- @param x the x click position
+-- @param y	the y click position
+-- @return <code>true</code> clicked<br><code>false</code> not clicked
+function Button:isClicked(x,y)
+	if x >= self.minx and x <= self.maxx then
+		if y >= self.miny and y <= self.maxy then
+			helper.debug_print("Element:isClicked", self.name)
+			return true, self.active
+		end
+	end
+	return false, self.active
+end
+
+--- Prints button information for debugging purposes
+function Button:debugPrint()
+	print("ButtonDEBUG:")
+	print("\tname:\t" .. self.name)
+	print("\ttext:\t" .. self.text)
+	print("\ttype:\t" .. self.type)
+	print("\tradioIndex:\t" .. tostring(self.radioIndex))
+	print("\tparams:\t" .. textutils.serialize(self.params))
+	print("\txmin: " .. self.minx .. ", xmax: ".. self.maxx .. ", ymin: " .. self.miny .. ", ymax: " .. self.maxy)
+end
+
+--- Set position for button text
+-- @param textpos	the table with two keys: "h" (horizontal) and "v" (vertical). See also: <a href="helper#validPositions">helper.validPositions</a>
+-- @usage Button:setTextPosition({h = "center", v = "top"})
+function Button:setTextPosition(textpos)
+	self.textposition = textpos
+	--self:draw(self.target)
+end
+
+--- Sets the parameters for the function
+-- @param funcparams	the parameters for the function (<code>table</code>)
+-- @usage Button:setFuncParams({"param1", "param2", 1})
+function Button:setFuncParams(funcparams)
+	if funcparams ~= nil and type(funcparams) ~= "table" then
+		error("Button.create: funcparams needs to be a table!")
+	end
+	self.params = funcparams
+end
+
+--- Sets the radioIndex of the Button. Needed when using a set of buttons as RadioButtons
+-- @param index	the value to group buttons
+function Button:setRadioIndex(index)
+	self.radioIndex = index
+end
+
+--- Sets the button state
+-- @param state	<code>true</code> activated<br><code>false</code> deactivated
+function Button:setState(state)
+	self.active = state
+	self:draw(self.target)
+end
+
+--- Toggles the button state
+function Button:toggle()
+	self.active = not self.active
+	self:draw(self.target)
+end
+
+--- Draws the button to <code>target</code>
+-- @param target the target, e.g. monitor
+function Button:draw(target)
+	-- clear the grid, just in case with base colors
+	self:clear(target)
+
+	local posH = self.textposition["h"] or config.defaultHPosition
+	local posV = self.textposition["v"] or config.defaultVPosition
+
+	local elemWidth = self.maxx - self.minx + 1
+	local elemHeight = self.maxy - self.miny + 1
+
+	if self.active then
+		target.setBackgroundColor(self.colorActive)
+	else
+		target.setBackgroundColor(self.colorNonActive)
+	end
+
+	-- validate position data, if not valid, then set to default -> "center"
+	-- also corrects 'textposition' attributes to default
+	-- if not helper.isValidPosition(posH) then
+		-- posH = config.defaultHPosition
+		-- self.textposition["h"] = posH
+	-- end
+	-- if not helper.isValidPosition(posV) then
+		-- posV = config.defaultVPosition
+		-- self.textposition["v"] = posV
+	-- end
+
+	-- format text in horizontal position, I don't care about 'rest' atm!
+	local text, rest = helper.formatText(self.text, elemWidth, " ", posH)
+
+	local filler = helper.formatText("", elemWidth, " ", "l")
+
+	-- vertical position of label text
+	local position
+	if posV == "top" or posV == "t" then
+		position = 1
+	elseif posV == "center" or posV == "c" then
+		position = math.ceil(elemHeight/2)
+	elseif posV == "bottom" or posV == "b" then
+		position = elemHeight
+	end
+
+	-- draw the actual Label
+	for i = 1, elemHeight do
+		-- DEBUG
+		-- filler = helper.formatText(""..i, elemWidth, " ", "l")
+		target.setCursorPos(self.minx, self.miny + i - 1)
+		if i == position then
+			target.write(text)
+		else
+			target.write(filler)
+		end
+	end
+	target.setBackgroundColor(config.defaultBackgroundColor)
+	return true
+end
+
+--- Toggles other Buttons if they are int the same group of radio indices
+-- @param elements the set of other the elements
+function Button:toggleOthers(elements)
+	if not self.active then
+		-- Check each element	
+		for key1, value1 in pairs(elements) do
+			for key2, value2 in pairs(value1) do
+				-- Element should not be nil and have a type of "button"
+				if value2 ~= nil and value2.type == "button" then
+					if value2.radioIndex == self.radioIndex then					
+						if value2.active then
+							value2:toggle()						
+						end
+					end
+				end
+			end			
+		end
+	end
+	-- toggle self anyway
+	self:toggle()	
+end
+
+--- Executes the call-back function with the specified parameters
+-- @return <code>true</code> valid function, <code>false</code> invalid function
+function Button:execFunction()
+	helper.debug_print("Button:execFunction", self.name)
+	if self.func == nil then
+		helper.printError("ERROR: no function on " .. self.type .. " \n\t\tname: " .. self.name .. ", text: " .. self.text)
+	else
+		if self.params then
+			self.func(unpack(self.params))
+			return true
+		else
+			self.func()
+			return true
+		end
+	end
+	return false
+end
+--~ ##### Button END #####
+
+--~ ##### Label START#####
+Label = {}
+Label.__index = Label
+
+--- Creates a new label
+-- @param name the ame to identify the element, should be unique!
+-- @param text the label text, duh!
+-- @param textpos	the table with two keys: "h" (horizontal) and "v" (vertical). See also: <a href="helper#validPositions">helper.validPositions</a>
+function Label.create(name, text, textpos)
+	local lbl = Element.create(name, "label")
+	setmetatable(Label, Element)
+	setmetatable(lbl, Label)
+	lbl.text = text
+	lbl.textposition = textpos
+	return lbl
+end
+
+--- Draws the label to <code>target</code>
+-- @param target the target, e.g monitor
+function Label:draw(target)
+	-- clear the grid, just in case with base colors
+	self:clear(target)
+
+	local posH = self.textposition["h"]
+	local posV = self.textposition["v"]
+
+	local elemWidth = self.maxx - self.minx + 1
+	local elemHeight = self.maxy - self.miny + 1
+
+	-- validate position data, if not valid, then set to default -> "center"
+	-- also corrects 'textposition' attributes to default
+	if not helper.isValidPosition(posH) then
+		posH = config.defaultHPosition
+		self.textposition["h"] = posH
+	end
+	if not helper.isValidPosition(posV) then
+		posV = config.defaultVPosition
+		self.textposition["v"] = posV
+	end
+
+	-- format text in horizontal position, I don't care about 'rest' atm!
+	local text, rest = helper.formatText(self.text, elemWidth, " ", posH)
+
+	--[[ Maybe feature: long text, automatic line break and so on...
+	local labeltext = {}
+	local index = 1
+	labeltext[index] = text
+	index = index + 1
+	while rest ~= nil do
+		text, rest = helper.formatText(rest, elemWidth, " ", posH)
+		labeltext[index] = text
+		index = index + 1
+	end
+	-- more than one line of text
+	if rest ~= nil then
+		rest = helper.formatText(rest, elemWidth, " ", posH)
+	end
+	--]]
+
+	local filler = helper.formatText("", elemWidth, " ", "l")
+
+	-- vertical position of label text
+	local position
+	if posV == "top" or posV == "t" then
+		position = 1
+	elseif posV == "center" or posV == "c" then
+		position = math.ceil(elemHeight/2)
+	elseif posV == "bottom" or posV == "b" then
+		position = elemHeight
+	end
+
+	-- draw the actual Label
+	for i = 1, elemHeight do
+		-- DEBUG
+		-- filler = helper.formatText(""..i, elemWidth, " ", "l")
+		target.setCursorPos(self.minx, self.miny + i - 1)
+		if i == position then
+			target.write(text)
+		else
+			target.write(filler)
+		end
+	end
+	target.setBackgroundColor(config.defaultBackgroundColor)
+	return true
+end
+--~ ##### Label END #####
+--~ ##### Picker START #####
+Picker = {}
+Picker.__index = Picker
+--- Creates a new picker
+-- @param name	the name of the picker, should be unique
+-- @param text	the text over the picker
+-- @param startindex	the start index for valuerange
+-- @param valuerange	the table with values or a 2D table with
+-- 			containing another table and a step-value
+-- @usage Creates a new Picker with the Title "Data" and a table with values ranging from 0 to 100 in increments of 5 {0,5,10,15,..}<br>
+-- create("picky", "Data", 2, {{0,100}, 5})
+function Picker.create(name, text, startindex, valuerange)
+	local picker = Element.create(name, "picker")
+	setmetatable(Picker, Element)
+	setmetatable(picker, Picker)
+	picker.text = text
+	picker.buttonInc = Button.create(name, "+", true, func)
+	picker.buttonDec = Button.create(name, "-", true, func)
+	picker.clickedInc = false
+	picker.clickedDec = false
+
+	if #valuerange == 2 and type(valuerange[1]) == "table" then
+		picker.values = helper.createNumberList(valuerange[1][1], valuerange[1][2], valuerange[2])
+	else
+		picker.values = valuerange
+	end
+	picker.currentIndex = startindex
+
+	return picker
+end
+
+--- Draws the picker to <code>target</code>
+-- @param target the target, e.g monitor
+function Picker:draw(target)
+	-- clear the grid, just in case with base colors
+	self:clear(target)
+	local elemWidth = self.maxx - self.minx + 1
+	local elemHeight = self.maxy - self.miny + 1
+
+	local centerVpos = math.floor(elemHeight/2)
+	local value = helper.formatText(self.values[self.currentIndex], elemWidth, " ", "center")
+
+	if self.text == "" or self.text == nil then
+		target.setCursorPos(self.minx, self.miny + centerVpos)
+		target.write(value)
+	else
+		local text = helper.formatText(self.text, elemWidth , " ", "center")
+		target.setCursorPos(self.minx, self.miny)
+		target.write(text)
+		target.setCursorPos(self.minx, self.miny + centerVpos)
+		target.write(value)
+	end
+	-- format text in horizontal position
+
+	self.buttonInc:draw(target)
+	self.buttonDec:draw(target)
+
+	target.setBackgroundColor(config.defaultBackgroundColor)
+	return true
+end
+
+--- Checks if the picker was clicked at coordinate (<code>x</code>,<code>y</code>)
+-- @param x the x click position
+-- @param y	the y click position
+-- @return <code>true</code> clicked<br><code>false</code> not clicked
+function Picker:isClicked(x,y)
+	if x >= self.minx and x <= self.maxx then
+		if y >= self.miny and y <= self.maxy then
+			helper.debug_print("Picker:isClicked", self.name)
+			self.clickedInc = self.buttonInc:isClicked(x,y)
+			self.clickedDec = self.buttonDec:isClicked(x,y)
+			return self.clickedInc or self.clickedDec
+		end
+	end
+	return false
+end
+
+--- Sets the target of the element
+-- @param target the target, e.g. a monitor
+function Picker:setTarget(target)
+	self.target = target
+	self.buttonInc:setTarget(target)
+	self.buttonDec:setTarget(target)
+end
+
+--- Sets minimum and maximum x and y values for the the picker
+-- @param minx minimum x value
+-- @param maxx maximum x value
+-- @param miny minimum y value
+-- @param maxy maximum y value
+function Picker:setMinMaxXY(minx,maxx,miny,maxy)
+	--print(string.format("picker changing to: %s, %s, %s, %s", minx,maxx,miny,maxy)) 
+	self.minx = minx
+	self.maxx = maxx
+	self.miny = miny
+	self.maxy = maxy
+
+	local elemWidth = maxx - minx + 1
+	local elemHeight = maxy - miny + 1
+
+	local centerVpos = math.floor(elemHeight/2)
+	--string.format("changed: %s, %s, %s, %s", minx,maxx,miny,maxy)
+	--print(string.format("changed: %s, %s, %s, %s", minx,maxx,miny,maxy)) 
+	--print(string.format("buttonInc: %s, %s, %s, %s", self.buttonDec:getMinMaxXY()))
+	self.buttonDec:setMinMaxXY(minx, minx+1, miny+1, maxy-1)
+	--print(string.format("buttonDec: %s, %s, %s, %s", self.buttonDec:getMinMaxXY()))
+	self.buttonDec:setTextPosition({h = "right", v = "center"})
+	self.buttonInc:setMinMaxXY(maxx-1, maxx, miny+1, maxy-1)
+	--print(string.format("buttonInc: %s, %s, %s, %s", self.buttonDec:getMinMaxXY()))
+	self.buttonInc:setTextPosition({h = "left", v = "center"})
+	
+end
+
+--- Sets the function that should be executed when clicking on the "+"-button
+-- @param func the function
+function Picker:setIncFunction(func)
+	self.buttonInc.func = func
+end
+--- Sets the function that should be executed when clicking on the "-"-button
+-- @param func the function
+function Picker:setDecFunction(func)
+	self.buttonDec.func = func
+end
+
+--- Executes decreasing or increasing function, according to which button was actualy clicked
+function Picker:execFunction()
+	if self.clickedInc then
+		self.currentIndex = self.currentIndex + 1
+		if self.currentIndex > #self.values then
+			self.currentIndex = 1
+		end
+		local param = tostring(self.values[self.currentIndex])
+		self.buttonInc:setFuncParams({param})
+		self.buttonInc:execFunction()
+		self.clickedInc = false
+		self:draw(self.target)
+	elseif self.clickedDec then
+		self.currentIndex = self.currentIndex - 1
+		if self.currentIndex < 1 then
+			self.currentIndex = #self.values
+		end
+		local param = tostring(self.values[self.currentIndex])
+		self.buttonDec:setFuncParams({param})
+		self.buttonDec:execFunction()
+		self.clickedInc = false
+		self:draw(self.target)
+	end
+end
+--~ ##### Picker END #####
